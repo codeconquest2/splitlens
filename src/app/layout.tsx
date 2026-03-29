@@ -1,5 +1,6 @@
 import Link from "next/link";
 import ThemeToggle from "@/components/ThemeToggle";
+import UserMenu from "@/components/UserMenu";
 import "./globals.css";
 
 export const dynamic = "force-dynamic";
@@ -51,6 +52,7 @@ export default function RootLayout({
                     </Link>
                   ))}
                 </nav>
+                <UserMenu />
                 <ThemeToggle />
               </div>
             </div>
