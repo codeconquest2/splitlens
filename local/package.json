@@ -3,10 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "bash scripts/start-all.sh",
+    "dev:app": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "sidecar": "cd packages/random-forest-sidecar && ./start.sh",
+    "ollama:pull": "bash scripts/install-ollama-model.sh"
   },
   "dependencies": {
     "next": "^16.2.1",

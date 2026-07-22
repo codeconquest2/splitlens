@@ -49,7 +49,8 @@ export default function StatementReviewPage() {
             merchant: transaction.merchant,
             amount: transaction.amount,
             category: transaction.category,
-            is_shared: transaction.is_shared
+            is_shared: transaction.is_shared,
+            is_payment: transaction.is_payment
           })
           .eq("id", transaction.id)
       )

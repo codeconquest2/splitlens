@@ -15,8 +15,10 @@ const navLinks = [
   { href: "/personal", label: "Personal" },
   { href: "/budgeting", label: "Budgeting" },
   { href: "/shared", label: "Shared" },
+  { href: "/reconcile", label: "Reconcile" },
   { href: "/contacts", label: "People" },
   { href: "/statements", label: "Statements" },
+  { href: "/settings", label: "Models" },
   { href: "/groups", label: "Groups" }
 ];
 

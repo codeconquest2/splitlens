@@ -84,6 +84,7 @@ export default function SharedPage() {
       .from("shared_expenses")
       .insert({
         created_by: payload.paidBy,
+        paid_by_contact_id: payload.payingContactId ?? null,
         description: payload.description,
         total_amount: payload.amount,
         currency: payload.currency,
@@ -150,6 +151,23 @@ export default function SharedPage() {
         }
 
         if (split.user_id === currentUserId) {
+          if (item.expense.paid_by_contact_id) {
+            const contact = contacts.find((entry) => entry.id === item.expense.paid_by_contact_id);
+            const key = `contact:${item.expense.paid_by_contact_id}`;
+            const current = accumulator[key] ?? {
+              amount: 0,
+              currency: item.expense.currency ?? "USD",
+              splitIds: [],
+              label: contact?.name ?? contact?.email ?? "Unknown person",
+              latestAt: item.expense.created_at
+            };
+            current.amount -= Number(split.amount_owed ?? 0);
+            current.splitIds.push(split.id);
+            current.latestAt = current.latestAt > item.expense.created_at ? current.latestAt : item.expense.created_at;
+            accumulator[key] = current;
+            return;
+          }
+
           const key = item.expense.description?.includes("others owe you")
             ? `import:${item.expense.id}`
             : `you-owe:${item.expense.id}`;
@@ -183,12 +201,19 @@ export default function SharedPage() {
           split.user_id === currentUserId &&
           !item.expense.description?.includes("others owe you")
       )
-      .map((split) => ({
-        id: split.id,
-        description: item.expense.description ?? "Shared expense",
-        currency: item.expense.currency ?? "USD",
-        amount: Number(split.amount_owed ?? 0)
-      }))
+      .map((split) => {
+        const creditor = item.expense.paid_by_contact_id
+          ? contacts.find((contact) => contact.id === item.expense.paid_by_contact_id)?.name ?? "Someone"
+          : null;
+        return {
+          id: split.id,
+          description: creditor
+            ? `${item.expense.description ?? "Shared expense"} · owed to ${creditor}`
+            : (item.expense.description ?? "Shared expense"),
+          currency: item.expense.currency ?? "USD",
+          amount: Number(split.amount_owed ?? 0)
+        };
+      })
   );
   const sortedRunningBalances = Object.entries(runningBalances)
     .filter(([personKey]) => !personKey.startsWith("you-owe:"))

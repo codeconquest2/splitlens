@@ -7,6 +7,13 @@ import MonthSummaryCard from "@/components/MonthSummaryCard";
 import SimplePieChart from "@/components/SimplePieChart";
 import TransactionTable from "@/components/TransactionTable";
 import { createClient } from "@/lib/supabase";
+import {
+  getCurrentMonthStart,
+  isSpendTransaction,
+  manualExpenseAsTransaction,
+  monthBounds,
+  sumSpend
+} from "@/lib/spending";
 import type { ManualExpense, Transaction } from "@/lib/types";
 
 const manualExpenseCategories = [
@@ -24,19 +31,6 @@ const manualExpenseCategories = [
   "Entertainment",
   "Other"
 ];
-
-function getCurrentMonthStart() {
-  const today = new Date();
-  return new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0, 10);
-}
-
-function monthBounds(month: string) {
-  const start = month;
-  const date = new Date(start);
-  date.setMonth(date.getMonth() + 1);
-  const end = date.toISOString().slice(0, 10);
-  return { start, end };
-}
 
 export default function PersonalPage() {
   const supabase = useMemo(() => createClient(), []);
@@ -107,23 +101,13 @@ export default function PersonalPage() {
 
   const combinedTransactions: Transaction[] = [
     ...transactions,
-    ...manualExpenses.map((expense) => ({
-      id: `manual-${expense.id}`,
-      statement_id: null,
-      user_id: expense.user_id,
-      date: expense.date,
-      merchant: expense.description,
-      amount: expense.amount,
-      currency: expense.currency,
-      category: expense.category,
-      is_shared: false,
-      created_at: expense.created_at
-    }))
+    ...manualExpenses.map(manualExpenseAsTransaction)
   ];
 
-  const totalSpent = combinedTransactions.reduce((sum, transaction) => sum + Number(transaction.amount ?? 0), 0);
+  const spendTransactions = combinedTransactions.filter(isSpendTransaction);
+  const totalSpent = sumSpend(combinedTransactions);
   const topCategoryTotals = Object.entries(
-    combinedTransactions.reduce<Record<string, number>>((totals, transaction) => {
+    spendTransactions.reduce<Record<string, number>>((totals, transaction) => {
       const key = transaction.category?.trim() || "Other";
       totals[key] = (totals[key] ?? 0) + Number(transaction.amount ?? 0);
       return totals;

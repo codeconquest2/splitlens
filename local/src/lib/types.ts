@@ -51,6 +51,7 @@ export interface Transaction {
   currency: string | null;
   category: string | null;
   is_shared: boolean | null;
+  is_payment: boolean | null;
   created_at: string;
 }
 
@@ -80,6 +81,7 @@ export interface SharedExpense {
   created_by: string | null;
   group_id: string | null;
   transaction_id: string | null;
+  paid_by_contact_id: string | null;
   description: string | null;
   total_amount: number | string | null;
   currency: string | null;
@@ -103,6 +105,7 @@ export interface ParsedTransaction {
   merchant: string;
   amount: number;
   currency: string;
+  is_payment: boolean;
 }
 
 export interface SharedExpensePayload {
@@ -111,6 +114,7 @@ export interface SharedExpensePayload {
   currency: string;
   date: string;
   paidBy: string;
+  payingContactId?: string;
   groupId?: string;
   participantIds: string[];
   payerMode: "self" | "other" | "equal";

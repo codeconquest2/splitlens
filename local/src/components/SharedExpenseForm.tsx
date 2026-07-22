@@ -24,6 +24,7 @@ export default function SharedExpenseForm({
   const [participantIds, setParticipantIds] = useState<string[]>([]);
   const [customAmounts, setCustomAmounts] = useState<Record<string, number>>({});
   const [yourShare, setYourShare] = useState("");
+  const [payingContactId, setPayingContactId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -47,6 +48,12 @@ export default function SharedExpenseForm({
     const equalShare = Number(amount) / (participantIds.length + 1);
     setYourShare(equalShare.toFixed(2));
   }, [amount, participantIds, payerMode]);
+
+  useEffect(() => {
+    if ((payerMode === "other" || payerMode === "equal") && participantIds.length) {
+      setPayingContactId((current) => (participantIds.includes(current) ? current : participantIds[0]));
+    }
+  }, [participantIds, payerMode]);
 
   function toggleUser(userId: string) {
     setParticipantIds((current) =>
@@ -81,6 +88,11 @@ export default function SharedExpenseForm({
       return;
     }
 
+    if ((payerMode === "other" || payerMode === "equal") && !payingContactId) {
+      setError("Select who paid for this expense.");
+      return;
+    }
+
     setError(null);
     setIsSubmitting(true);
 
@@ -91,6 +103,7 @@ export default function SharedExpenseForm({
         currency,
         date,
         paidBy: currentUserId,
+        payingContactId: payerMode === "self" ? undefined : payingContactId,
         participantIds,
         payerMode,
         yourShare: payerMode === "self" ? undefined : Number(yourShare),
@@ -104,6 +117,7 @@ export default function SharedExpenseForm({
       setParticipantIds([]);
       setCustomAmounts({});
       setYourShare("");
+      setPayingContactId("");
       setPayerMode("self");
     } catch (submissionError) {
       const message =
@@ -247,6 +261,23 @@ export default function SharedExpenseForm({
 
       {(payerMode === "other" || payerMode === "equal") && participantIds.length ? (
         <div className="mt-4 space-y-4">
+          <div>
+            <label className="mb-2 block text-sm font-medium text-gray-700">Who paid the bill?</label>
+            <select
+              value={payingContactId}
+              onChange={(event) => setPayingContactId(event.target.value)}
+              className="w-full max-w-md"
+            >
+              {participantIds.map((participantId) => {
+                const contact = contactsList.find((entry) => entry.id === participantId);
+                return (
+                  <option key={participantId} value={participantId}>
+                    {contact?.name ?? contact?.email ?? "Participant"}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
           <div>
             <p className="text-sm font-medium text-gray-700">
               {payerMode === "equal" ? "Your equal share" : "How much do you owe?"}

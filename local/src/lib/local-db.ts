@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile } from "fs/promises";
 import path from "path";
 
 type Row = Record<string, any>;
-type FilterOperator = "eq" | "gte" | "lt";
+type FilterOperator = "eq" | "gte" | "lt" | "in";
 
 export interface QueryFilter {
   column: string;
@@ -23,6 +23,8 @@ export interface LocalQuery {
   filters?: QueryFilter[];
   orders?: QueryOrder[];
   single?: boolean;
+  maybeSingle?: boolean;
+  limit?: number;
 }
 
 interface LocalDatabase {
@@ -36,6 +38,7 @@ interface LocalDatabase {
   manual_expenses: Row[];
   shared_expenses: Row[];
   expense_splits: Row[];
+  model_settings: Row[];
 }
 
 const localUser = {
@@ -57,7 +60,8 @@ const tableNames = [
   "budgets",
   "manual_expenses",
   "shared_expenses",
-  "expense_splits"
+  "expense_splits",
+  "model_settings"
 ] as const;
 
 function emptyDatabase(): LocalDatabase {
@@ -79,7 +83,8 @@ function emptyDatabase(): LocalDatabase {
     budgets: [],
     manual_expenses: [],
     shared_expenses: [],
-    expense_splits: []
+    expense_splits: [],
+    model_settings: []
   };
 }
 
@@ -113,6 +118,10 @@ function matchesFilter(row: Row, filter: QueryFilter) {
   if (filter.operator === "eq") return rowValue === filter.value;
   if (filter.operator === "gte") return String(rowValue ?? "") >= String(filter.value ?? "");
   if (filter.operator === "lt") return String(rowValue ?? "") < String(filter.value ?? "");
+  if (filter.operator === "in") {
+    const values = Array.isArray(filter.value) ? filter.value : [];
+    return values.includes(rowValue);
+  }
   return true;
 }
 
@@ -151,13 +160,17 @@ function addDefaults(table: string, row: Row) {
   if (table === "transactions") {
     next.currency ??= "USD";
     next.is_shared ??= false;
+    next.is_payment ??= false;
   }
   if (table === "budgets") {
     next.planned_amount ??= 0;
     next.currency ??= "USD";
   }
   if (table === "manual_expenses") next.currency ??= "USD";
-  if (table === "shared_expenses") next.currency ??= "USD";
+  if (table === "shared_expenses") {
+    next.currency ??= "USD";
+    next.paid_by_contact_id ??= null;
+  }
   if (table === "expense_splits") next.paid ??= false;
 
   return next;
@@ -176,8 +189,16 @@ export async function runLocalQuery(query: LocalQuery): Promise<{ data: any; err
   let data: Row | Row[] | null = null;
 
   if (query.action === "select") {
-    const rows = applyColumns(applyOrders(applyFilters(table, query.filters), query.orders), query.columns);
-    data = query.single ? rows[0] ?? null : rows;
+    let rows = applyOrders(applyFilters(table, query.filters), query.orders);
+    if (query.limit !== undefined && query.limit >= 0) {
+      rows = rows.slice(0, query.limit);
+    }
+    rows = applyColumns(rows, query.columns);
+    if (query.single || query.maybeSingle) {
+      data = rows[0] ?? null;
+    } else {
+      data = rows;
+    }
   }
 
   if (query.action === "insert") {
@@ -283,13 +304,28 @@ class LocalQueryBuilder {
     return this;
   }
 
+  in(column: string, values: any[]) {
+    this.query.filters?.push({ column, operator: "in", value: values });
+    return this;
+  }
+
   order(column: string, options: { ascending?: boolean } = {}) {
     this.query.orders?.push({ column, ascending: options.ascending ?? true });
     return this;
   }
 
+  limit(count: number) {
+    this.query.limit = count;
+    return this;
+  }
+
   single() {
     this.query.single = true;
+    return this;
+  }
+
+  maybeSingle() {
+    this.query.maybeSingle = true;
     return this;
   }
 

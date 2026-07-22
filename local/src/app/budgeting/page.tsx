@@ -5,6 +5,7 @@ export const dynamic = "force-dynamic";
 import { useEffect, useMemo, useState } from "react";
 import SimplePieChart from "@/components/SimplePieChart";
 import { createClient } from "@/lib/supabase";
+import { getCurrentMonthStart, isSpendTransaction, monthBounds } from "@/lib/spending";
 import type { Budget, ManualExpense, SharedExpense, Transaction } from "@/lib/types";
 
 const categories = [
@@ -18,19 +19,6 @@ const categories = [
   "Entertainment",
   "Other"
 ];
-
-function getCurrentMonthStart() {
-  const today = new Date();
-  return new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0, 10);
-}
-
-function monthBounds(month: string) {
-  const start = month;
-  const date = new Date(start);
-  date.setMonth(date.getMonth() + 1);
-  const end = date.toISOString().slice(0, 10);
-  return { start, end };
-}
 
 function downloadFile(filename: string, content: string, type: string) {
   const blob = new Blob([content], { type });
@@ -131,7 +119,7 @@ export default function BudgetingPage() {
   }, [currentUserId, hasInitializedMonth, month, supabase]);
 
   const spendByCategory = [
-    ...transactions.map((transaction) => ({
+    ...transactions.filter(isSpendTransaction).map((transaction) => ({
       category: transaction.category,
       amount: transaction.amount
     })),

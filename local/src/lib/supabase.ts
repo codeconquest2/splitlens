@@ -60,13 +60,28 @@ class BrowserLocalQueryBuilder {
     return this;
   }
 
+  in(column: string, values: any[]) {
+    this.query.filters?.push({ column, operator: "in", value: values });
+    return this;
+  }
+
   order(column: string, options: { ascending?: boolean } = {}) {
     this.query.orders?.push({ column, ascending: options.ascending ?? true });
     return this;
   }
 
+  limit(count: number) {
+    this.query.limit = count;
+    return this;
+  }
+
   single() {
     this.query.single = true;
+    return this;
+  }
+
+  maybeSingle() {
+    this.query.maybeSingle = true;
     return this;
   }
 

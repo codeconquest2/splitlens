@@ -4,16 +4,56 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { parseSplitwiseCsv, type SplitwiseImportRow } from "@/lib/splitwise";
+import { useEffect, useMemo, useState } from "react";
+import {
+  parseSplitwiseCsv,
+  resolveYourName,
+  withMemberContext,
+  type SplitwiseImportRow
+} from "@/lib/splitwise";
+import { createClient } from "@/lib/supabase";
 
 export default function SplitwiseImportPage() {
   const router = useRouter();
+  const supabase = useMemo(() => createClient(), []);
   const [file, setFile] = useState<File | null>(null);
   const [rows, setRows] = useState<SplitwiseImportRow[]>([]);
+  const [memberNames, setMemberNames] = useState<string[]>([]);
+  const [format, setFormat] = useState<"group" | "personal">("personal");
+  const [yourName, setYourName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [importedCount, setImportedCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    async function loadProfile() {
+      const {
+        data: { user }
+      } = await supabase.auth.getUser();
+      if (!user) {
+        return;
+      }
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("name")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (profile?.name && memberNames.length) {
+        setYourName((current) => current || resolveYourName(memberNames, profile.name));
+      }
+    }
+
+    loadProfile();
+  }, [memberNames, supabase]);
+
+  const displayRows = useMemo(() => {
+    if (format === "group" && yourName) {
+      return withMemberContext(rows, yourName);
+    }
+    return rows;
+  }, [format, rows, yourName]);
 
   async function handlePreview() {
     if (!file) {
@@ -22,15 +62,38 @@ export default function SplitwiseImportPage() {
     }
 
     const csvText = await file.text();
-    const parsedRows = parseSplitwiseCsv(csvText);
-    setRows(parsedRows);
+    const parsed = parseSplitwiseCsv(csvText);
+    setRows(parsed.rows);
+    setMemberNames(parsed.member_names);
+    setFormat(parsed.format);
     setImportedCount(null);
-    setError(parsedRows.length ? null : "No importable rows found in this CSV.");
+
+    const {
+      data: { user }
+    } = await supabase.auth.getUser();
+    let profileName: string | null = null;
+    if (user) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("name")
+        .eq("id", user.id)
+        .maybeSingle();
+      profileName = profile?.name ?? null;
+    }
+
+    const resolvedName = resolveYourName(parsed.member_names, profileName);
+    setYourName(resolvedName);
+    setError(parsed.rows.length ? null : "No importable rows found in this CSV.");
   }
 
   async function handleImport() {
     if (!rows.length) {
       setError("Preview the CSV before importing.");
+      return;
+    }
+
+    if (format === "group" && !yourName) {
+      setError("Select which group member is you before importing.");
       return;
     }
 
@@ -43,7 +106,10 @@ export default function SplitwiseImportPage() {
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({ rows })
+        body: JSON.stringify({
+          rows,
+          yourName: format === "group" ? yourName : ""
+        })
       });
 
       if (!response.ok) {
@@ -85,6 +151,24 @@ export default function SplitwiseImportPage() {
             className="w-full"
           />
         </div>
+
+        {format === "group" && memberNames.length ? (
+          <div className="mt-4">
+            <label className="mb-2 block text-sm font-medium text-gray-700">Which member are you?</label>
+            <select value={yourName} onChange={(event) => setYourName(event.target.value)} className="w-full max-w-md">
+              {memberNames.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+            <p className="mt-2 text-sm text-gray-500">
+              Found {memberNames.length} group members in this export. Contacts will be created automatically for
+              anyone not already in your list.
+            </p>
+          </div>
+        ) : null}
+
         <div className="mt-4 flex gap-3">
           <button
             type="button"
@@ -108,7 +192,7 @@ export default function SplitwiseImportPage() {
         ) : null}
       </div>
 
-      {rows.length ? (
+      {displayRows.length ? (
         <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200 text-sm">
@@ -118,17 +202,21 @@ export default function SplitwiseImportPage() {
                   <th className="px-4 py-3 font-medium">Description</th>
                   <th className="px-4 py-3 font-medium">Total Cost</th>
                   <th className="px-4 py-3 font-medium">Your share</th>
+                  <th className="px-4 py-3 font-medium">Direction</th>
                   <th className="px-4 py-3 font-medium">Currency</th>
                   <th className="px-4 py-3 font-medium">Category</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {rows.map((row, index) => (
+                {displayRows.map((row, index) => (
                   <tr key={`${row.description}-${row.date}-${index}`}>
                     <td className="px-4 py-3 text-gray-700">{row.date}</td>
                     <td className="px-4 py-3 text-gray-900">{row.description}</td>
                     <td className="px-4 py-3 text-gray-900">{row.total_amount.toFixed(2)}</td>
                     <td className="px-4 py-3 text-gray-900">{row.your_share.toFixed(2)}</td>
+                    <td className="px-4 py-3 text-gray-700">
+                      {row.is_payment ? "Payment (skipped)" : row.type === "owed" ? "Owed to you" : "You owe"}
+                    </td>
                     <td className="px-4 py-3 text-gray-700">{row.currency}</td>
                     <td className="px-4 py-3 text-gray-700">{row.category}</td>
                   </tr>
