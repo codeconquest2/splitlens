@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { getModelSettings, saveModelSettings } from "@/lib/pipeline/config";
 import { pullOllamaModel } from "@/lib/pipeline/llm-client";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { createLocalServerClient } from "@/lib/local-data-server";
 
 export async function POST(request: Request) {
-  const supabase = createServerSupabaseClient();
+  const supabase = createLocalServerClient();
   const {
     data: { user }
   } = await supabase.auth.getUser();

@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 
 import { useEffect, useMemo, useState } from "react";
 import SimplePieChart from "@/components/SimplePieChart";
-import { createClient } from "@/lib/supabase";
+import { createClient } from "@/lib/local-data-client";
 import { getCurrentMonthStart, isSpendTransaction, monthBounds } from "@/lib/spending";
 import type { Budget, ManualExpense, SharedExpense, Transaction } from "@/lib/types";
 

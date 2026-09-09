@@ -1,10 +1,7 @@
 import type { ExtractionInput, ExtractionProviderId, ModelSettings, ProviderAvailability } from "@/lib/pipeline/types";
 import type { ParsedTransaction } from "@/lib/types";
 import {
-  checkCustomExtractionAvailability,
   checkOllamaExtractionAvailability,
-  extractWithCustomLlm,
-  extractWithCustomLlmVision,
   extractWithOllama,
   extractWithOllamaVision,
   isImageExtractionInput
@@ -25,7 +22,7 @@ export async function checkExtractionAvailability(
       settings.ollama_vision_model
     );
   }
-  return checkCustomExtractionAvailability(settings.custom_llm_base_url, settings.custom_llm_model);
+  return checkRegexExtractionAvailability();
 }
 
 export async function extractTransactions(
@@ -42,7 +39,7 @@ export async function extractTransactions(
   const imageInput = isImageExtractionInput(input);
 
   if (imageInput && provider === "regex") {
-    throw new Error("Image statements require Ollama or a custom vision LLM. Change extraction in Settings → Models.");
+    throw new Error("Image statements require local Ollama vision extraction. Change extraction in Settings -> Models.");
   }
 
   if (provider === "ollama") {
@@ -56,31 +53,6 @@ export async function extractTransactions(
         throw error;
       }
       console.warn("Ollama extraction failed, falling back to regex", error);
-      return extractWithRegex(input);
-    }
-  }
-
-  if (provider === "custom") {
-    try {
-      if (imageInput) {
-        return await extractWithCustomLlmVision(
-          input,
-          settings.custom_llm_base_url,
-          settings.custom_llm_model,
-          settings.custom_llm_api_key
-        );
-      }
-      return await extractWithCustomLlm(
-        input,
-        settings.custom_llm_base_url,
-        settings.custom_llm_model,
-        settings.custom_llm_api_key
-      );
-    } catch (error) {
-      if (imageInput) {
-        throw error;
-      }
-      console.warn("Custom LLM extraction failed, falling back to regex", error);
       return extractWithRegex(input);
     }
   }

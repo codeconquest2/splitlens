@@ -1,9 +1,9 @@
 import { createLocalDatabaseClient } from "@/lib/local-db";
 
-export function createServerSupabaseClient() {
+export function createLocalServerClient() {
   return createLocalDatabaseClient();
 }
 
-export function createAdminSupabaseClient() {
+export function createLocalAdminClient() {
   return createLocalDatabaseClient();
 }

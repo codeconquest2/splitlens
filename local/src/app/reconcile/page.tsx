@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { findReconcileMatches, yourShareForExpense, type ReconcileMatch } from "@/lib/reconciliation";
 import { getCurrentMonthStart, isSpendTransaction, monthBounds } from "@/lib/spending";
-import { createClient } from "@/lib/supabase";
+import { createClient } from "@/lib/local-data-client";
 import type { ExpenseSplit, SharedExpense, Transaction } from "@/lib/types";
 
 export default function ReconcilePage() {

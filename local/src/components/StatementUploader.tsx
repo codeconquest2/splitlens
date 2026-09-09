@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase";
+import { createClient } from "@/lib/local-data-client";
 
 const currencies = ["USD", "EUR", "GBP", "INR", "CAD"];
 const monthOptions = [
@@ -36,7 +36,7 @@ export default function StatementUploader() {
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!file) {
-      setError("Select a PDF or image file first.");
+      setError("Select a statement file first.");
       return;
     }
 
@@ -122,7 +122,7 @@ export default function StatementUploader() {
                 <label className="mb-2 block text-sm font-medium text-gray-700">File</label>
                 <input
                   type="file"
-                  accept="application/pdf,image/png,image/jpeg"
+                  accept="application/pdf,image/png,image/jpeg,text/csv,.csv,.ofx,.qfx"
                   onChange={(event) => setFile(event.target.files?.[0] ?? null)}
                   className="w-full"
                 />

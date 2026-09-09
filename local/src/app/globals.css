@@ -20,6 +20,14 @@ button:disabled {
   @apply cursor-not-allowed opacity-60;
 }
 
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 .theme-light {
   color-scheme: light;
 }
@@ -29,53 +37,94 @@ button:disabled {
 }
 
 .theme-light .bg-gray-50 {
-  background-color: #eef6ff;
+  background-color: #f6f4ef;
+}
+
+.theme-light .bg-white {
+  background-color: #fffdf8;
+}
+
+.theme-light .bg-gray-100 {
+  background-color: #ece8df;
+}
+
+.theme-light .bg-emerald-50 {
+  background-color: #eef5ee;
+}
+
+.theme-light .border-gray-200,
+.theme-light .border-emerald-200 {
+  border-color: #ded8cf;
+}
+
+.theme-light .border-gray-300 {
+  border-color: #cfc7ba;
+}
+
+.theme-light input,
+.theme-light select,
+.theme-light textarea {
+  background-color: #fffdf8;
+  color: #18181b;
+}
+
+.theme-light input::placeholder,
+.theme-light textarea::placeholder {
+  color: #8a8175;
 }
 
 .theme-light .bg-indigo-600 {
-  background-color: #2563eb;
+  background-color: #242321;
 }
 
 .theme-light .hover\:bg-indigo-700:hover {
-  background-color: #1d4ed8;
+  background-color: #3a3834;
 }
 
 .theme-light .text-indigo-600 {
-  color: #2563eb;
+  color: #242321;
 }
 
 .theme-light .hover\:text-indigo-700:hover {
-  color: #1d4ed8;
+  color: #3a3834;
 }
 
 .theme-light .hover\:border-indigo-600:hover,
 .theme-light .focus\:border-indigo-600:focus {
-  border-color: #2563eb;
+  border-color: #514d47;
 }
 
 .theme-dark {
-  background-color: #020617;
+  background-color: #000000;
   color: #e2e8f0;
 }
 
 .theme-dark .bg-gray-50 {
-  background-color: #020617;
+  background-color: #000000;
 }
 
 .theme-dark .bg-white {
-  background-color: #0f172a;
+  background-color: #09090b;
 }
 
 .theme-dark .bg-gray-100 {
-  background-color: #111827;
+  background-color: #18181b;
+}
+
+.theme-dark .bg-emerald-50 {
+  background-color: #18181b;
 }
 
 .theme-dark .border-gray-200 {
-  border-color: #1e293b;
+  border-color: #27272a;
+}
+
+.theme-dark .border-emerald-200 {
+  border-color: #3f3f46;
 }
 
 .theme-dark .border-gray-300 {
-  border-color: #334155;
+  border-color: #3f3f46;
 }
 
 .theme-dark .text-black {
@@ -89,24 +138,24 @@ button:disabled {
 }
 
 .theme-dark .bg-indigo-600 {
-  background-color: #2563eb;
+  background-color: #27272a;
 }
 
 .theme-dark .hover\:bg-indigo-700:hover {
-  background-color: #1d4ed8;
+  background-color: #3f3f46;
 }
 
 .theme-dark .text-indigo-600 {
-  color: #60a5fa;
+  color: #d4d4d8;
 }
 
 .theme-dark .hover\:text-indigo-700:hover {
-  color: #93c5fd;
+  color: #f4f4f5;
 }
 
 .theme-dark .hover\:border-indigo-600:hover,
 .theme-dark .focus\:border-indigo-600:focus {
-  border-color: #60a5fa;
+  border-color: #a1a1aa;
 }
 
 .theme-dark input,

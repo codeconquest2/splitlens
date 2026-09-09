@@ -2,10 +2,10 @@ import { NextResponse } from "next/server";
 import { getModelSettings } from "@/lib/pipeline/config";
 import { listOllamaModels } from "@/lib/pipeline/llm-client";
 import { probeBackends, resolveProviders } from "@/lib/pipeline/resolve-providers";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { createLocalServerClient } from "@/lib/local-data-server";
 
 export async function GET() {
-  const supabase = createServerSupabaseClient();
+  const supabase = createLocalServerClient();
   const {
     data: { user }
   } = await supabase.auth.getUser();

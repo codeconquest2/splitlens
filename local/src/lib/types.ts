@@ -55,6 +55,21 @@ export interface Transaction {
   created_at: string;
 }
 
+export interface StatementParseDebug {
+  id: string;
+  statement_id: string | null;
+  extraction_provider: string;
+  categorization_provider: string;
+  raw_text: string | null;
+  parsed_count: number;
+  saved_count: number;
+  duplicate_count: number;
+  warnings: string[];
+  duplicate_rows?: Array<Record<string, unknown>>;
+  skipped_rows?: Array<Record<string, unknown>>;
+  created_at: string;
+}
+
 export interface Budget {
   id: string;
   user_id: string | null;

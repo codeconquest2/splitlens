@@ -1,8 +1,7 @@
 interface LlmGenerateOptions {
-  provider: "ollama" | "custom";
+  provider: "ollama";
   baseUrl: string;
   model: string;
-  apiKey?: string;
   prompt: string;
 }
 
@@ -31,51 +30,24 @@ function extractJsonBlock(text: string) {
 }
 
 export async function generateJsonFromLlm<T>(options: LlmGenerateOptions): Promise<T> {
-  if (options.provider === "ollama") {
-    const response = await fetch(`${options.baseUrl.replace(/\/$/, "")}/api/generate`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: options.model,
-        prompt: options.prompt,
-        stream: false,
-        format: "json"
-      }),
-      signal: AbortSignal.timeout(120000)
-    });
-
-    if (!response.ok) {
-      throw new Error(`Ollama request failed (${response.status})`);
-    }
-
-    const payload = (await response.json()) as { response?: string };
-    return JSON.parse(extractJsonBlock(payload.response ?? "{}")) as T;
-  }
-
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (options.apiKey) {
-    headers.Authorization = `Bearer ${options.apiKey}`;
-  }
-
-  const response = await fetch(`${options.baseUrl.replace(/\/$/, "")}/chat/completions`, {
+  const response = await fetch(`${options.baseUrl.replace(/\/$/, "")}/api/generate`, {
     method: "POST",
-    headers,
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       model: options.model,
-      messages: [{ role: "user", content: options.prompt }],
-      response_format: { type: "json_object" },
-      temperature: 0
+      prompt: options.prompt,
+      stream: false,
+      format: "json"
     }),
     signal: AbortSignal.timeout(120000)
   });
 
   if (!response.ok) {
-    throw new Error(`Custom LLM request failed (${response.status})`);
+    throw new Error(`Ollama request failed (${response.status})`);
   }
 
-  const payload = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
-  const content = payload.choices?.[0]?.message?.content ?? "{}";
-  return JSON.parse(extractJsonBlock(content)) as T;
+  const payload = (await response.json()) as { response?: string };
+  return JSON.parse(extractJsonBlock(payload.response ?? "{}")) as T;
 }
 
 export async function generateJsonFromOllamaVision<T>(options: LlmVisionOptions): Promise<T> {
@@ -104,44 +76,6 @@ export async function generateJsonFromOllamaVision<T>(options: LlmVisionOptions)
 
   const payload = (await response.json()) as { message?: { content?: string } };
   return JSON.parse(extractJsonBlock(payload.message?.content ?? "{}")) as T;
-}
-
-export async function generateJsonFromCustomVision<T>(options: LlmVisionOptions): Promise<T> {
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (options.apiKey) {
-    headers.Authorization = `Bearer ${options.apiKey}`;
-  }
-
-  const response = await fetch(`${options.baseUrl.replace(/\/$/, "")}/chat/completions`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({
-      model: options.model,
-      messages: [
-        {
-          role: "user",
-          content: [
-            { type: "text", text: options.prompt },
-            {
-              type: "image_url",
-              image_url: { url: `data:${options.mimeType};base64,${options.imageBase64}` }
-            }
-          ]
-        }
-      ],
-      response_format: { type: "json_object" },
-      temperature: 0
-    }),
-    signal: AbortSignal.timeout(180000)
-  });
-
-  if (!response.ok) {
-    throw new Error(`Custom vision LLM request failed (${response.status})`);
-  }
-
-  const payload = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
-  const content = payload.choices?.[0]?.message?.content ?? "{}";
-  return JSON.parse(extractJsonBlock(content)) as T;
 }
 
 export async function pullOllamaModel(baseUrl: string, model: string) {

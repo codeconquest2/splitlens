@@ -3,7 +3,6 @@ import { looksLikePayment } from "@/lib/spending";
 import { buildExtractionPrompt, buildImageExtractionPrompt } from "@/lib/pipeline/prompts";
 import type { ExtractionInput, ProviderAvailability } from "@/lib/pipeline/types";
 import {
-  generateJsonFromCustomVision,
   generateJsonFromLlm,
   generateJsonFromOllamaVision
 } from "@/lib/pipeline/llm-client";
@@ -112,69 +111,6 @@ export async function extractWithOllamaVision(
   });
 
   return mapLlmRowsToTransactions(payload.transactions ?? [], input.currency);
-}
-
-export async function extractWithCustomLlm(
-  input: ExtractionInput,
-  baseUrl: string,
-  model: string,
-  apiKey: string
-): Promise<ParsedTransaction[]> {
-  const prompt = buildExtractionPrompt(input.text ?? "", input.currency);
-  const payload = await generateJsonFromLlm<{ transactions?: LlmTransactionRow[] }>({
-    provider: "custom",
-    baseUrl,
-    model,
-    apiKey,
-    prompt
-  });
-
-  return mapLlmRowsToTransactions(payload.transactions ?? [], input.currency);
-}
-
-export async function extractWithCustomLlmVision(
-  input: ExtractionInput,
-  baseUrl: string,
-  model: string,
-  apiKey: string
-): Promise<ParsedTransaction[]> {
-  if (!input.imageBase64 || !input.mimeType) {
-    throw new Error("Image data is required for vision extraction.");
-  }
-
-  const prompt = buildImageExtractionPrompt(input.currency);
-  const payload = await generateJsonFromCustomVision<{ transactions?: LlmTransactionRow[] }>({
-    provider: "custom",
-    baseUrl,
-    model,
-    apiKey,
-    prompt,
-    imageBase64: input.imageBase64,
-    mimeType: input.mimeType
-  });
-
-  return mapLlmRowsToTransactions(payload.transactions ?? [], input.currency);
-}
-
-export async function checkCustomExtractionAvailability(
-  baseUrl: string,
-  model: string
-): Promise<ProviderAvailability> {
-  if (!baseUrl.trim() || !model.trim()) {
-    return { available: false, message: "Set custom LLM base URL and model in Settings." };
-  }
-
-  try {
-    const response = await fetch(`${baseUrl.replace(/\/$/, "")}/models`, {
-      signal: AbortSignal.timeout(4000)
-    });
-    if (response.ok) {
-      return { available: true, message: "Custom LLM endpoint reachable." };
-    }
-    return { available: true, message: "Custom endpoint configured (health check skipped)." };
-  } catch {
-    return { available: false, message: "Custom LLM endpoint is not reachable." };
-  }
 }
 
 export function isImageExtractionInput(input: ExtractionInput) {

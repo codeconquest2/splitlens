@@ -32,52 +32,11 @@ export async function categorizeBatchWithOllama(merchants: string[], baseUrl: st
   return categories.map(normalizeCategory);
 }
 
-export async function categorizeBatchWithCustomLlm(
-  merchants: string[],
-  baseUrl: string,
-  model: string,
-  apiKey: string
-) {
-  if (!merchants.length) {
-    return [];
-  }
-
-  const prompt = buildCategorizationPrompt(merchants);
-  const payload = await generateJsonFromLlm<{ categories?: string[] }>({
-    provider: "custom",
-    baseUrl,
-    model,
-    apiKey,
-    prompt
-  });
-
-  const categories = payload.categories ?? [];
-  if (categories.length !== merchants.length) {
-    throw new Error("Custom LLM returned the wrong number of categories.");
-  }
-
-  return categories.map(normalizeCategory);
-}
-
 export async function safeCategorizeWithOllama(merchants: string[], baseUrl: string, model: string) {
   try {
     return await categorizeBatchWithOllama(merchants, baseUrl, model);
   } catch (error) {
     console.warn("Ollama categorization failed, falling back to regex", error);
-    return categorizeBatchWithRegex(merchants);
-  }
-}
-
-export async function safeCategorizeWithCustomLlm(
-  merchants: string[],
-  baseUrl: string,
-  model: string,
-  apiKey: string
-) {
-  try {
-    return await categorizeBatchWithCustomLlm(merchants, baseUrl, model, apiKey);
-  } catch (error) {
-    console.warn("Custom LLM categorization failed, falling back to regex", error);
     return categorizeBatchWithRegex(merchants);
   }
 }

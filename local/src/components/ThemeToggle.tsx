@@ -26,9 +26,10 @@ export default function ThemeToggle() {
     <button
       type="button"
       onClick={toggleTheme}
-      className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-black transition hover:border-indigo-600"
+      title={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}
+      className="flex h-8 w-8 items-center justify-center rounded-md border border-zinc-700 bg-zinc-950 text-sm font-medium text-zinc-200 transition hover:border-zinc-500 hover:text-white"
     >
-      {theme === "light" ? "Dark mode" : "Light mode"}
+      {theme === "light" ? "D" : "L"}
     </button>
   );
 }

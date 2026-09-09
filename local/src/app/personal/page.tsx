@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import MonthSummaryCard from "@/components/MonthSummaryCard";
 import SimplePieChart from "@/components/SimplePieChart";
 import TransactionTable from "@/components/TransactionTable";
-import { createClient } from "@/lib/supabase";
+import { createClient } from "@/lib/local-data-client";
 import {
   getCurrentMonthStart,
   isSpendTransaction,

@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import SharedExpenseForm from "@/components/SharedExpenseForm";
 import SplitSummaryCard from "@/components/SplitSummaryCard";
-import { createClient } from "@/lib/supabase";
+import { createClient } from "@/lib/local-data-client";
 import type {
   Contact,
   ExpenseSplit,

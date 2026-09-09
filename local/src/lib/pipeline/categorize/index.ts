@@ -1,7 +1,6 @@
 import type { CategorizationProviderId, ModelSettings, ProviderAvailability } from "@/lib/pipeline/types";
 import {
   checkOllamaCategorizationAvailability,
-  safeCategorizeWithCustomLlm,
   safeCategorizeWithOllama
 } from "@/lib/pipeline/categorize/llm";
 import {
@@ -12,7 +11,6 @@ import {
   checkRandomForestAvailability,
   safeCategorizeWithRandomForest
 } from "@/lib/pipeline/categorize/random-forest";
-import { checkCustomExtractionAvailability } from "@/lib/pipeline/extract/llm";
 
 export async function checkCategorizationAvailability(
   provider: CategorizationProviderId,
@@ -27,7 +25,7 @@ export async function checkCategorizationAvailability(
   if (provider === "random_forest") {
     return checkRandomForestAvailability(settings.random_forest_url);
   }
-  return checkCustomExtractionAvailability(settings.custom_llm_base_url, settings.custom_llm_model);
+  return checkRegexCategorizationAvailability();
 }
 
 export async function categorizeMerchants(
@@ -47,15 +45,6 @@ export async function categorizeMerchants(
 
   if (provider === "random_forest") {
     return safeCategorizeWithRandomForest(merchants, settings.random_forest_url);
-  }
-
-  if (provider === "custom") {
-    return safeCategorizeWithCustomLlm(
-      merchants,
-      settings.custom_llm_base_url,
-      settings.custom_llm_model,
-      settings.custom_llm_api_key
-    );
   }
 
   return categorizeBatchWithRegex(merchants);

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { createClient } from "@/lib/supabase";
+import { createClient } from "@/lib/local-data-client";
 
 interface SplitSummaryCardProps {
   personName: string;

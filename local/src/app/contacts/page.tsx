@@ -3,7 +3,7 @@
 export const dynamic = "force-dynamic";
 
 import { useEffect, useMemo, useState } from "react";
-import { createClient } from "@/lib/supabase";
+import { createClient } from "@/lib/local-data-client";
 import type { Contact } from "@/lib/types";
 
 export default function ContactsPage() {

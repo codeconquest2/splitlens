@@ -1,5 +1,8 @@
-import { mkdir, readFile, writeFile } from "fs/promises";
+import { access, chmod, mkdir, readFile, readdir, writeFile } from "fs/promises";
+import { existsSync } from "fs";
+import { DatabaseSync } from "node:sqlite";
 import path from "path";
+import { encryptBackupPayload } from "@/lib/local-backup-crypto";
 
 type Row = Record<string, any>;
 type FilterOperator = "eq" | "gte" | "lt" | "in";
@@ -39,6 +42,10 @@ interface LocalDatabase {
   shared_expenses: Row[];
   expense_splits: Row[];
   model_settings: Row[];
+  statement_parse_debug: Row[];
+  security_settings: Row[];
+  import_batches: Row[];
+  category_rules: Row[];
 }
 
 const localUser = {
@@ -47,8 +54,11 @@ const localUser = {
   user_metadata: { name: "Local User" }
 };
 
-const dataDir = path.join(process.cwd(), "data");
-const dbPath = path.join(dataDir, "splitlens.local.json");
+const dataDir = process.env.SPLITLENS_DATA_DIR || path.join(process.cwd(), "data");
+const legacyJsonPath = path.join(dataDir, "splitlens.local.json");
+const dbPath = path.join(dataDir, "splitlens.local.sqlite");
+const backupDir = path.join(dataDir, "backups");
+let writeQueue: Promise<{ data: any; error: any }> = Promise.resolve({ data: null, error: null });
 
 const tableNames = [
   "profiles",
@@ -61,8 +71,43 @@ const tableNames = [
   "manual_expenses",
   "shared_expenses",
   "expense_splits",
-  "model_settings"
+  "model_settings",
+  "statement_parse_debug",
+  "security_settings",
+  "import_batches",
+  "category_rules"
 ] as const;
+
+const actions = ["select", "insert", "update", "delete", "upsert"] as const;
+const filterOperators = ["eq", "gte", "lt", "in"] as const;
+const identifierPattern = /^[a-z_][a-z0-9_]*$/;
+
+async function chmodOwnerOnly(filePath: string) {
+  try {
+    await chmod(filePath, 0o600);
+  } catch {
+    // Some filesystems do not support POSIX file modes.
+  }
+}
+
+async function secureBackupDirectory() {
+  await mkdir(backupDir, { recursive: true });
+  const entries = await readdir(backupDir, { withFileTypes: true });
+  await Promise.all(
+    entries
+      .filter((entry) => entry.isFile())
+      .map((entry) => chmodOwnerOnly(path.join(backupDir, entry.name)))
+  );
+}
+
+async function fileExists(filePath: string) {
+  try {
+    await access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 function emptyDatabase(): LocalDatabase {
   return {
@@ -84,7 +129,11 @@ function emptyDatabase(): LocalDatabase {
     manual_expenses: [],
     shared_expenses: [],
     expense_splits: [],
-    model_settings: []
+    model_settings: [],
+    statement_parse_debug: [],
+    security_settings: [],
+    import_batches: [],
+    category_rules: []
   };
 }
 
@@ -92,15 +141,8 @@ async function readDatabase(): Promise<LocalDatabase> {
   await mkdir(dataDir, { recursive: true });
 
   try {
-    const raw = await readFile(dbPath, "utf8");
-    const database = JSON.parse(raw) as LocalDatabase;
-    for (const tableName of tableNames) {
-      database[tableName] ??= [];
-    }
-    if (!database.profiles.some((profile) => profile.id === localUser.id)) {
-      database.profiles.push(emptyDatabase().profiles[0]);
-    }
-    return database;
+    await ensureSqliteDatabase();
+    return readSqliteDatabase();
   } catch {
     const database = emptyDatabase();
     await writeDatabase(database);
@@ -110,7 +152,135 @@ async function readDatabase(): Promise<LocalDatabase> {
 
 async function writeDatabase(database: LocalDatabase) {
   await mkdir(dataDir, { recursive: true });
-  await writeFile(dbPath, `${JSON.stringify(database, null, 2)}\n`, "utf8");
+  await ensureSqliteDatabase();
+  const sqlite = openSqliteDatabase();
+  try {
+    sqlite.exec("BEGIN IMMEDIATE");
+    sqlite.prepare("DELETE FROM local_records").run();
+    const insert = sqlite.prepare(
+      "INSERT INTO local_records (table_name, row_id, payload, updated_at) VALUES (?, ?, ?, ?)"
+    );
+    const now = new Date().toISOString();
+    for (const tableName of tableNames) {
+      for (const row of database[tableName]) {
+        const rowId = String(row.id ?? crypto.randomUUID());
+        insert.run(tableName, rowId, JSON.stringify({ ...row, id: rowId }), now);
+      }
+    }
+    sqlite.exec("COMMIT");
+  } catch (error) {
+    sqlite.exec("ROLLBACK");
+    throw error;
+  } finally {
+    sqlite.close();
+  }
+  await chmodOwnerOnly(dbPath);
+}
+
+function openSqliteDatabase() {
+  const sqlite = new DatabaseSync(dbPath);
+  sqlite.exec("PRAGMA journal_mode = WAL");
+  sqlite.exec("PRAGMA synchronous = NORMAL");
+  sqlite.exec("PRAGMA busy_timeout = 5000");
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS local_records (
+      table_name TEXT NOT NULL,
+      row_id TEXT NOT NULL,
+      payload TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (table_name, row_id)
+    )
+  `);
+  sqlite.exec("CREATE INDEX IF NOT EXISTS idx_local_records_table ON local_records (table_name)");
+  return sqlite;
+}
+
+async function ensureSqliteDatabase() {
+  await mkdir(dataDir, { recursive: true });
+  const sqliteAlreadyExists = await fileExists(dbPath);
+  const sqlite = openSqliteDatabase();
+  try {
+    const countRow = sqlite.prepare("SELECT COUNT(*) AS count FROM local_records").get() as { count: number };
+    const isEmpty = Number(countRow?.count ?? 0) === 0;
+    if (!sqliteAlreadyExists || isEmpty) {
+      let database: LocalDatabase | null = null;
+      if (existsSync(legacyJsonPath)) {
+        try {
+          const raw = await readFile(legacyJsonPath, "utf8");
+          database = normalizeDatabase(JSON.parse(raw) as Partial<LocalDatabase>);
+          await chmodOwnerOnly(legacyJsonPath);
+        } catch {
+          database = null;
+        }
+      }
+      if (!database) {
+        database = emptyDatabase();
+      }
+
+      sqlite.exec("BEGIN IMMEDIATE");
+      const insert = sqlite.prepare(
+        "INSERT OR REPLACE INTO local_records (table_name, row_id, payload, updated_at) VALUES (?, ?, ?, ?)"
+      );
+      const now = new Date().toISOString();
+      for (const tableName of tableNames) {
+        for (const row of database[tableName]) {
+          const rowId = String(row.id ?? crypto.randomUUID());
+          insert.run(tableName, rowId, JSON.stringify({ ...row, id: rowId }), now);
+        }
+      }
+      sqlite.exec("COMMIT");
+    }
+  } catch (error) {
+    sqlite.exec("ROLLBACK");
+    throw error;
+  } finally {
+    sqlite.close();
+  }
+  await chmodOwnerOnly(dbPath);
+}
+
+function readSqliteDatabase(): LocalDatabase {
+  const sqlite = openSqliteDatabase();
+  try {
+    const database = emptyDatabase();
+    for (const tableName of tableNames) {
+      database[tableName] = [];
+    }
+    const rows = sqlite.prepare("SELECT table_name, payload FROM local_records").all() as Array<{
+      table_name: keyof LocalDatabase;
+      payload: string;
+    }>;
+    for (const row of rows) {
+      if (tableNames.includes(row.table_name as any)) {
+        database[row.table_name].push(JSON.parse(row.payload));
+      }
+    }
+    return normalizeDatabase(database);
+  } finally {
+    sqlite.close();
+  }
+}
+
+function normalizeDatabase(database: Partial<LocalDatabase>): LocalDatabase {
+  const normalized = database as LocalDatabase;
+  for (const tableName of tableNames) {
+    if (!Array.isArray(normalized[tableName])) {
+      normalized[tableName] = [];
+    }
+  }
+  if (!normalized.profiles.some((profile) => profile.id === localUser.id)) {
+    normalized.profiles.push(emptyDatabase().profiles[0]);
+  }
+  normalized.model_settings = normalized.model_settings.map((settings) => {
+    const {
+      custom_llm_base_url: _customLlmBaseUrl,
+      custom_llm_model: _customLlmModel,
+      custom_llm_api_key: _customLlmApiKey,
+      ...localSettings
+    } = settings;
+    return localSettings;
+  });
+  return normalized;
 }
 
 function matchesFilter(row: Row, filter: QueryFilter) {
@@ -183,7 +353,57 @@ function tableFor(database: LocalDatabase, table: string): Row[] {
   return database[table as keyof LocalDatabase];
 }
 
-export async function runLocalQuery(query: LocalQuery): Promise<{ data: any; error: any }> {
+function validateColumnName(column: unknown, label: string) {
+  if (typeof column !== "string" || !identifierPattern.test(column)) {
+    throw new Error(`Invalid local query ${label}`);
+  }
+}
+
+function validatePayload(payload: unknown) {
+  if (payload === undefined) return;
+  const rows = Array.isArray(payload) ? payload : [payload];
+  for (const row of rows) {
+    if (!row || typeof row !== "object" || Array.isArray(row)) {
+      throw new Error("Invalid local query payload");
+    }
+  }
+}
+
+export function validateLocalQuery(query: LocalQuery) {
+  if (!query || typeof query !== "object") {
+    throw new Error("Invalid local query");
+  }
+  if (!tableNames.includes(query.table as any)) {
+    throw new Error(`Unknown local table: ${query.table}`);
+  }
+  if (!actions.includes(query.action as any)) {
+    throw new Error(`Unsupported local action: ${query.action}`);
+  }
+  if (query.columns && query.columns !== "*") {
+    query.columns.split(",").forEach((column) => validateColumnName(column.trim(), "column"));
+  }
+  for (const filter of query.filters ?? []) {
+    validateColumnName(filter.column, "filter column");
+    if (!filterOperators.includes(filter.operator as any)) {
+      throw new Error(`Unsupported local filter: ${filter.operator}`);
+    }
+  }
+  for (const order of query.orders ?? []) {
+    validateColumnName(order.column, "order column");
+    if (typeof order.ascending !== "boolean") {
+      throw new Error("Invalid local query order");
+    }
+  }
+  if (query.limit !== undefined && (!Number.isInteger(query.limit) || query.limit < 0 || query.limit > 10000)) {
+    throw new Error("Invalid local query limit");
+  }
+  if (query.action !== "select") {
+    validatePayload(query.payload);
+  }
+}
+
+async function executeLocalQuery(query: LocalQuery): Promise<{ data: any; error: any }> {
+  validateLocalQuery(query);
   const database = await readDatabase();
   const table = tableFor(database, query.table);
   let data: Row | Row[] | null = null;
@@ -252,6 +472,48 @@ export async function runLocalQuery(query: LocalQuery): Promise<{ data: any; err
   }
 
   return { data, error: null };
+}
+
+export async function runLocalQuery(query: LocalQuery): Promise<{ data: any; error: any }> {
+  if (query.action === "select") {
+    return executeLocalQuery(query);
+  }
+
+  const nextWrite = writeQueue.then(() => executeLocalQuery(query));
+  writeQueue = nextWrite.catch(() => ({ data: null, error: null }));
+  return nextWrite;
+}
+
+export async function exportLocalDatabase() {
+  return readDatabase();
+}
+
+export async function backupLocalDatabase(passphrase?: string) {
+  await secureBackupDirectory();
+  const database = await readDatabase();
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+
+  if (passphrase) {
+    const backupPath = path.join(backupDir, `splitlens-${timestamp}.splitlens-backup`);
+    await writeFile(
+      backupPath,
+      `${JSON.stringify(encryptBackupPayload(database, passphrase), null, 2)}\n`,
+      "utf8"
+    );
+    await chmodOwnerOnly(backupPath);
+    return backupPath;
+  }
+
+  const backupPath = path.join(backupDir, `splitlens-${timestamp}.json`);
+  await writeFile(backupPath, `${JSON.stringify(database, null, 2)}\n`, "utf8");
+  await chmodOwnerOnly(backupPath);
+  return backupPath;
+}
+
+export async function restoreLocalDatabase(database: Partial<LocalDatabase>) {
+  const backupPath = await backupLocalDatabase();
+  await writeDatabase(normalizeDatabase(database));
+  return backupPath;
 }
 
 class LocalQueryBuilder {
@@ -360,6 +622,8 @@ export function createLocalDatabaseClient(): any {
         return { data: { user: { ...localUser, email: email || localUser.email } }, error: null };
       },
       async signOut() {
+        const { lockLocalApp } = await import("@/lib/local-security");
+        await lockLocalApp();
         return { error: null };
       }
     },

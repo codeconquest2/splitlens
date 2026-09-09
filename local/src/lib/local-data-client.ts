@@ -136,6 +136,11 @@ export function createClient(): any {
         return { data: { user: { ...localUser, email: email || localUser.email } }, error: null };
       },
       async signOut() {
+        await fetch("/api/local-security", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "lock" })
+        });
         return { error: null };
       }
     },

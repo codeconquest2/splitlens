@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import StatementUploader from "@/components/StatementUploader";
-import { createClient } from "@/lib/supabase";
+import { createClient } from "@/lib/local-data-client";
 import type { Statement } from "@/lib/types";
 
 export default function StatementsPage() {

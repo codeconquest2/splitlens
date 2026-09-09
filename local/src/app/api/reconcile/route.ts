@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createAdminSupabaseClient, createServerSupabaseClient } from "@/lib/supabase-server";
+import { createLocalAdminClient, createLocalServerClient } from "@/lib/local-data-server";
 
 export async function POST(request: Request) {
   try {
@@ -10,7 +10,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "No links provided" }, { status: 400 });
     }
 
-    const supabase = createServerSupabaseClient();
+    const supabase = createLocalServerClient();
     const {
       data: { user }
     } = await supabase.auth.getUser();
@@ -19,7 +19,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const admin = createAdminSupabaseClient();
+    const admin = createLocalAdminClient();
     let linkedCount = 0;
 
     for (const link of links) {

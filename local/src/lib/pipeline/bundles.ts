@@ -31,17 +31,6 @@ export const MODEL_BUNDLES: ModelBundle[] = [
       categorization: ["random_forest"]
     },
     installHint: "Start the RF sidecar at http://localhost:8765 or set your own URL in Settings."
-  },
-  {
-    id: "custom-llm",
-    name: "Custom LLM endpoint",
-    description: "OpenAI-compatible API for your own hosted model.",
-    kind: "downloadable",
-    enables: {
-      extraction: ["custom"],
-      categorization: ["custom"]
-    },
-    installHint: "Set base URL, model name, and optional API key in Settings."
   }
 ];
 

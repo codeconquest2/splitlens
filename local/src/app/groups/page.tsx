@@ -3,7 +3,7 @@
 export const dynamic = "force-dynamic";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { createClient } from "@/lib/supabase";
+import { createClient } from "@/lib/local-data-client";
 import type { Group, GroupMember, Profile } from "@/lib/types";
 
 export default function GroupsPage() {

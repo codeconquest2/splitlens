@@ -11,7 +11,7 @@ import {
   withMemberContext,
   type SplitwiseImportRow
 } from "@/lib/splitwise";
-import { createClient } from "@/lib/supabase";
+import { createClient } from "@/lib/local-data-client";
 
 export default function SplitwiseImportPage() {
   const router = useRouter();

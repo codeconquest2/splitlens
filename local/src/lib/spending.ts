@@ -17,17 +17,19 @@ const paymentMerchantPatterns = [
 ];
 
 export function monthBounds(month: string) {
-  const start = month;
-  const date = new Date(start);
-  date.setMonth(date.getMonth() + 1);
-  const end = date.toISOString().slice(0, 10);
+  const [year, monthIndex] = month.split("-").map(Number);
+  const start = `${year}-${String(monthIndex).padStart(2, "0")}-01`;
+  const nextMonth = monthIndex === 12 ? 1 : monthIndex + 1;
+  const nextYear = monthIndex === 12 ? year + 1 : year;
+  const end = `${nextYear}-${String(nextMonth).padStart(2, "0")}-01`;
   return { start, end };
 }
 
 export function previousMonthStart(month: string) {
-  const date = new Date(month);
-  date.setMonth(date.getMonth() - 1);
-  return new Date(date.getFullYear(), date.getMonth(), 1).toISOString().slice(0, 10);
+  const [year, monthIndex] = month.split("-").map(Number);
+  const previousMonth = monthIndex === 1 ? 12 : monthIndex - 1;
+  const previousYear = monthIndex === 1 ? year - 1 : year;
+  return `${previousYear}-${String(previousMonth).padStart(2, "0")}-01`;
 }
 
 export function getCurrentMonthStart() {

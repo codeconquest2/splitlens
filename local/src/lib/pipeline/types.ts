@@ -1,7 +1,7 @@
 import type { ParsedTransaction } from "@/lib/types";
 
-export type ExtractionProviderId = "auto" | "regex" | "ollama" | "custom";
-export type CategorizationProviderId = "auto" | "regex" | "ollama" | "random_forest" | "custom";
+export type ExtractionProviderId = "auto" | "regex" | "ollama";
+export type CategorizationProviderId = "auto" | "regex" | "ollama" | "random_forest";
 export type PipelineMode =
   | "auto"
   | "regex_only"
@@ -19,9 +19,6 @@ export interface ModelSettings {
   ollama_extraction_model: string;
   ollama_vision_model: string;
   ollama_categorization_model: string;
-  custom_llm_base_url: string;
-  custom_llm_model: string;
-  custom_llm_api_key: string;
   random_forest_url: string;
   installed_bundles: string[];
   updated_at: string;
